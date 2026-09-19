@@ -40,7 +40,7 @@ Planned as version 1.0.0, the first release. Until then the add-on is developed 
 ### Documentation and tests
 
 - A readme covering the settings, the recovery, the log messages and advice for Japanese source text.
-- 46 unit tests for the helpers, the model list, the presets and the prompts (`node --test`).
+- 44 unit tests for the helpers, the model list, the presets and the prompts (`node --test`).
 - `tools/buildPresets.js` builds the presets from the prompts; a test fails when a preset file is out of date.
 
 [Unreleased]: https://github.com/just-killy/veniceTranslator/commits/develop
