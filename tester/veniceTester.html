@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Venice Translator — tester</title>
+<link rel="stylesheet" href="veniceTester.css">
+</head>
+<body>
+
+<header>
+    <div class="modes">
+        <label><input type="radio" name="mode" value="translate" checked> <span>Translation</span></label>
+        <label><input type="radio" name="mode" value="raw"> <span>Plain chat</span></label>
+    </div>
+    <div class="engine" id="engineLabel">&nbsp;</div>
+    <button id="send" class="send">Send</button>
+</header>
+
+<main>
+    <section class="pane input">
+        <h2 id="inputTitle">Text to translate</h2>
+        <textarea id="input" spellcheck="false"></textarea>
+        <p class="hint" id="inputHint"></p>
+    </section>
+
+    <section class="pane output">
+        <nav class="tabs">
+            <button class="tab active" data-target="result">Result</button>
+            <button class="tab" data-target="raw">Raw reply</button>
+            <button class="tab" data-target="http">HTTP exchange</button>
+        </nav>
+        <pre id="result" class="view"></pre>
+        <pre id="raw" class="view" hidden></pre>
+        <pre id="http" class="view" hidden></pre>
+    </section>
+</main>
+
+<footer id="status">Ready.</footer>
+
+<script src="veniceTester.js"></script>
+</body>
+</html>

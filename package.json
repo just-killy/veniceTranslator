@@ -1,0 +1,20 @@
+{
+    "name": "veniceTranslator",
+    "title": "Venice Translator",
+    "description": "Translator++ engine for the Venice.ai API: rows are sent as JSON in batches, every reply is checked, and the engine recovers from the typical mistakes of language models.",
+    "main": "veniceEngine.js",
+    "homepage": "https://venice.ai/settings/api",
+    "version": "1.0.0",
+    "autoload": false,
+    "icon": "icon.png",
+    "load": [
+        "veniceSettings.js",
+        "veniceAssistant.js",
+        "veniceEngine.js"
+    ],
+    "minimumVersion": "8.8.8",
+    "config": {
+        "isMandatory": false,
+        "isDisabled": false
+    }
+}
