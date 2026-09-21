@@ -4,9 +4,9 @@ All notable changes to the Venice Translator add-on are listed in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the add-on follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.0] — 2026-09-21
 
-Planned as version 1.0.0, the first release. Until then the add-on is developed and tested in the `develop` branch.
+The first release.
 
 ### The engine
 
@@ -43,4 +43,4 @@ Planned as version 1.0.0, the first release. Until then the add-on is developed 
 - 44 unit tests for the helpers, the model list, the presets and the prompts (`node --test`).
 - `tools/buildPresets.js` builds the presets from the prompts; a test fails when a preset file is out of date.
 
-[Unreleased]: https://github.com/just-killy/veniceTranslator/commits/develop
+[1.0.0]: https://github.com/just-killy/veniceTranslator/releases/tag/v1.0.0
