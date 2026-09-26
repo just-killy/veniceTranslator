@@ -4,6 +4,16 @@ All notable changes to the Venice Translator add-on are listed in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the add-on follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- A row is no longer emptied when one Custom escape pattern hides text that another pattern has already hidden. Translator++ hands such a placeholder to the escape algorithm's `restore()`, which cannot parse it and drops the whole segment; the engine now unescapes it instead, so the game codes come back, and says once in the log which pattern to move.
+
+### Changed
+
+- HTTP 401, 402 and 403 now stop the whole batch translation. Asking again cannot help, so the Venice message is shown once and the remaining batches are left empty without sending anything and without the pause between batches — an exhausted balance used to produce one failed request and one full *Batch delay* per batch to the end of the run. The saved delay is not changed, and single translations and the tester are unaffected.
+
 ## [1.0.0] — 2026-09-21
 
 The first release.
