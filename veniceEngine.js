@@ -45,6 +45,15 @@ const cappedModels = new Set();
  */
 const rejectedParameters = new Map();
 
+/**
+ * An error that retrying cannot fix (no key, no balance, no access), hit while a batch translation
+ * was running. The batches after it are left empty instead of asking again: with a batch of
+ * thousands, an exhausted balance would otherwise produce thousands of identical failures.
+ * A batch whose index is not higher belongs to another run and clears this.
+ * @type {{message: string, batchIndex: number}|null}
+ */
+let fatalApiError = null;
+
 const wait      = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const log       = (message) => ui.log(VU.escapeHtml(`[Venice] ${message}`));
 const emptyRows = (count) => Array(count).fill("");
@@ -54,9 +63,46 @@ function rememberRejectedParameters(model, parameters) {
     rejectedParameters.set(model, new Set([...(rejectedParameters.get(model) ?? []), ...parameters]));
 }
 
+/** Index of the batch being translated, or -1 outside a batch translation (tester, a single row). */
+function batchIndexOf(options) {
+    const index = options.batchInfo?.info?.index;
+    return typeof index === "number" ? index : -1;
+}
+
+/** Whether this request must not be sent because the run already hit an unrecoverable API error. */
+function skipAfterFatalError(options) {
+    if (!fatalApiError) return false;
+    if (batchIndexOf(options) > fatalApiError.batchIndex) return true;
+    fatalApiError = null;   // an index that is not higher comes from another run: try again
+    return false;
+}
+
+/**
+ * Remember an unrecoverable API error and say once what happens to the rest of the run.
+ * Only batch translations are stopped this way; a single translation is simply reported as it is.
+ */
+function rememberFatalApiError(message, options) {
+    const batchIndex = batchIndexOf(options);
+    if (batchIndex < 0 || fatalApiError) return;
+    fatalApiError = { message, batchIndex };
+    log(`${message} Asking again cannot help, so the rest of this batch translation is skipped `
+        + `without sending more requests. Solve it, then translate the rows that stayed empty.`);
+}
+
 // ---------------------------------------------------------------------------
 // Settings helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Settings as saved, except that a run being skipped after an unrecoverable API error does not
+ * wait between batches any more. BatchTranslate reads "Batch delay" from the engine before every
+ * pause (`getOptions('batchDelay') || 1000`), so the shortest value it accepts is 1 ms; the saved
+ * setting is not touched, and the next run waits as configured again.
+ */
+thisEngine.getOptions = function(key) {
+    if (key === "batchDelay" && fatalApiError) return 1;
+    return TranslatorEngine.prototype.getOptions.call(this, key);
+};
 
 /**
  * Escape algorithm in effect: always one of the two JSON formats. An empty value or one that is
@@ -67,18 +113,46 @@ thisEngine.getEscapeAlgorithm = function() {
 };
 
 /**
- * Make the core preprocessing use the same escape algorithm as the rest of the pipeline.
- * CodeEscape.unescape() treats an empty text as "restore the whole request" (text || this.text), so a
- * row the engine leaves empty would come back as the JSON of the entire request and end up in the
- * cell. Empty rows are restored as empty rows instead.
+ * Make the core preprocessing use the same escape algorithm as the rest of the pipeline, and fix
+ * two things CodeEscape does to the restored text:
+ *
+ * - CodeEscape.unescape() treats an empty text as "restore the whole request" (text || this.text),
+ *   so a row the engine leaves empty would come back as the JSON of the entire request and end up
+ *   in the cell. Empty rows are restored as empty rows instead.
+ * - When a Custom escape pattern hides text that another pattern has already hidden, the stored
+ *   placeholder holds ${dat[n]} itself. CodeEscape.unescape() then calls restore() on that value,
+ *   the JSON algorithms cannot parse it, and the whole segment is dropped from the row (the log
+ *   shows "Bad translation result"). Such a value is unescaped instead, so the codes come back.
  */
 thisEngine.preProcessText = function(text, options) {
     this.escapeAlgorithm = this.getEscapeAlgorithm();
     const textObj = TranslatorEngine.prototype.preProcessText.call(this, text, options);
     const unescape = textObj?.unescape;
-    if (typeof unescape === "function") {
-        textObj.unescape = function(value, ...rest) {
-            return (value ?? "") === "" ? "" : unescape.call(this, value, ...rest);
+    const restore  = textObj?.restore;
+    if (typeof unescape !== "function") return textObj;
+
+    let depth = 0;
+    let reported = false;
+    textObj.unescape = function(value, ...rest) {
+        if ((value ?? "") === "") return "";
+        depth++;
+        try {
+            return unescape.call(this, value, ...rest);
+        } finally {
+            depth--;
+        }
+    };
+    if (typeof restore === "function") {
+        textObj.restore = function(value, ...rest) {
+            // Outside unescape() this is the model's reply, which the algorithm restores itself.
+            if (depth === 0 || typeof value !== "string") return restore.call(this, value, ...rest);
+            if (!reported) {
+                reported = true;
+                log(`A Custom escape pattern hid a code that another pattern had already hidden. `
+                    + `The codes were restored, but list that pattern above the ones it swallows, `
+                    + `or Translator++ will drop such rows: ${VU.preview(value, 80)}`);
+            }
+            return this.unescape(value, ...rest);
         };
     }
     return textObj;
@@ -351,6 +425,11 @@ thisEngine.fetchTranslation = async function(texts, _sourceLanguage, targetLangu
         : Array.isArray(texts) ? texts
         : [payload];
 
+    // Nothing can be translated any more (see rememberFatalApiError), so this batch is left empty.
+    if (skipAfterFatalError(options)) {
+        return VU.buildResultPayload(emptyRows(originals.length), this.getEscapeAlgorithm());
+    }
+
     // Long runs such as "Hyaaaaaaaaaaaa" make the model loop; only the request changes, not the grid.
     if (this.getOptions("shortenRepetitions") !== false) payload = VU.shortenPayloadRepetitions(payload);
 
@@ -498,7 +577,9 @@ thisEngine.requestTranslation = async function(job, maxRetries) {
         if (reply.error) {
             options.onRequestError?.(reply.error);
             const status = reply.error.status ? ` (HTTP ${reply.error.status})` : "";
-            throw new Error(`Venice API error${status}: ${reply.error.message}`);
+            const message = `Venice API error${status}: ${reply.error.message}`;
+            if (reply.error.fatal) rememberFatalApiError(message, options);
+            throw new Error(message);
         }
 
         const choice = reply.choices?.[0];

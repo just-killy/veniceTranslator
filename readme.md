@@ -84,7 +84,7 @@ reply in the expected shape ─► Translator++ restores the game codes ─► g
 |---|---|
 | No reply within *Batch Timeout* | Aborts and tries once more. |
 | HTTP 429, 408, 500, 502, 503, 504 | Up to 4 attempts, waiting as long as the rate-limit headers say, otherwise about 2, 4 and 8 seconds. |
-| HTTP 401, 402, 403 | Stops at once and shows the Venice message: bad key, no credit, no access. |
+| HTTP 401, 402, 403 | Bad key, no credit, no access — asking again cannot help. The Venice message is shown once, and the rest of the batch translation is skipped without sending anything and without waiting between batches; those rows stay empty for *untranslated only*. A single translation is simply reported. |
 | HTTP 400 naming a parameter | Resends without that parameter and keeps it dropped for this model until Translator++ restarts. |
 
 ## Settings
@@ -242,7 +242,8 @@ The engine writes messages prefixed with `[Venice]` to the Translator++ log.
 |---|---|
 | `HTTP 429: Rate limit exceeded Retrying in N s...` | Nothing. If it repeats, raise *Batch delay* or lower *Max concurrent requests*. |
 | `The request timed out after N s...` | Raise *Batch Timeout*. |
-| `Venice API error (HTTP 401)` / `(HTTP 402)` | Check the key; top up the account. |
+| `Venice API error (HTTP 401)` / `(HTTP 402)` | Check the key; top up the account. The rest of the run is skipped, so translate the rows that stayed empty afterwards. |
+| `A Custom escape pattern hid a code that another pattern had already hidden...` | Move that pattern above the ones it swallows in *Custom escape → Patterns*. The codes were put back, but Translator++ itself would drop such rows. |
 | `The model "..." rejected reasoning_effort...` | Clear that value to save one request per model. |
 | `"Maximum Tokens" (N) is above the output limit of ...` | Nothing; the request was capped. |
 | `Validation failed (attempt 1 of 3): Row count mismatch...` | Occasional retries are normal. If frequent, send fewer rows per request and keep the JSON schema on. |
